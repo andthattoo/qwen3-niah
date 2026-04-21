@@ -13,6 +13,17 @@ Tested on an H100 with CUDA 12.4.
 ```bash
 uv sync
 # llama-cpp-python is pulled from the prebuilt cu124 index via tool.uv.sources.
+# cu12 runtime libs are pinned explicitly so they coexist with whatever CUDA
+# version torch brings (torch ≥ 2.7 defaults to cu13).
+
+# Before running, point the dynamic loader at the bundled CUDA libs:
+export LD_LIBRARY_PATH=$(uv run python -c "
+import site, os
+sp = site.getsitepackages()[0]
+nv = os.path.join(sp, 'nvidia')
+print(':'.join(os.path.join(nv, d, 'lib') for d in os.listdir(nv)
+               if os.path.isdir(os.path.join(nv, d, 'lib'))))
+")
 ```
 
 ### Option B — pip
