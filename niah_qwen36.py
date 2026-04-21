@@ -123,26 +123,41 @@ def generate_passkey(seed: int) -> str:
 
 
 def load_filler_text() -> str:
-    """Return a big blob of semi-coherent English filler."""
+    """Return a big blob of semi-coherent English filler.
+
+    Downloads a few public-domain books from Project Gutenberg directly.  We
+    avoid the HuggingFace `datasets` pipeline because newer versions reject
+    dataset-loading scripts (which PG-19 uses).
+    """
     candidates = [Path("/tmp/filler.txt"), Path("./data/filler.txt")]
     for p in candidates:
         if p.exists() and p.stat().st_size > 1_000_000:
             return p.read_text()
 
-    # Build one from PG-19 (public domain books) — streaming, tokenize-friendly.
-    from datasets import load_dataset
-    print("  Streaming PG-19 to build filler corpus…")
-    ds = load_dataset("deepmind/pg19", split="validation", streaming=True)
+    import urllib.request
+    urls = [
+        # (label, url, approx MB)
+        ("War and Peace",        "https://www.gutenberg.org/files/2600/2600-0.txt"),  # ~3.2 MB
+        ("Moby Dick",            "https://www.gutenberg.org/files/2701/2701-0.txt"),  # ~1.2 MB
+        ("Anna Karenina",        "https://www.gutenberg.org/files/1399/1399-0.txt"),  # ~2.0 MB
+        ("Ulysses",              "https://www.gutenberg.org/files/4300/4300-0.txt"),  # ~1.5 MB
+        ("Les Misérables",       "https://www.gutenberg.org/files/135/135-0.txt"),    # ~3.3 MB
+    ]
+    print("  Downloading public-domain filler books from Project Gutenberg…")
     chunks: list[str] = []
-    total_chars = 0
-    for row in ds:
-        text = row.get("text", "")
-        if not text:
-            continue
-        chunks.append(text)
-        total_chars += len(text)
-        if total_chars > 8_000_000:   # ~8MB, plenty for 1M tokens worth
-            break
+    for label, url in urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                text = resp.read().decode("utf-8", errors="ignore")
+            chunks.append(text)
+            print(f"    {label}: {len(text):,} chars")
+        except Exception as e:
+            print(f"    {label}: FAILED ({e})")
+
+    if not chunks:
+        raise RuntimeError("Could not fetch any filler text sources.")
+
     blob = "\n\n".join(chunks)
     Path("/tmp/filler.txt").write_text(blob)
     print(f"  Filler corpus: {len(blob):,} chars cached → /tmp/filler.txt")
