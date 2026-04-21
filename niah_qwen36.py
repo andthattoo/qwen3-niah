@@ -35,12 +35,52 @@ Notes:
 from __future__ import annotations
 
 import argparse
+import ctypes
+import glob
 import json
 import os
 import random
 import re
+import site
 import time
 from pathlib import Path
+
+
+def _preload_cuda_libs() -> None:
+    """Preload CUDA shared libs from the venv's bundled nvidia/* packages so
+    llama-cpp-python finds them without needing LD_LIBRARY_PATH set in the shell.
+
+    llama-cpp-python's prebuilt cu124 wheel dynamically links libcudart.so.12 etc.
+    Modern torch bundles cu13 by default, so those libs sit in site-packages under
+    nvidia/cuda_runtime/lib/, nvidia/cublas/lib/, etc.  We dlopen them with
+    RTLD_GLOBAL before importing llama_cpp so the symbols are visible.
+    """
+    search_dirs = set()
+    for sp_dir in list(site.getsitepackages()) + [site.getusersitepackages()]:
+        nv = os.path.join(sp_dir, "nvidia")
+        if os.path.isdir(nv):
+            for sub in os.listdir(nv):
+                lib = os.path.join(nv, sub, "lib")
+                if os.path.isdir(lib):
+                    search_dirs.add(lib)
+
+    loaded: set[str] = set()
+    # Multiple passes: some libs depend on others; keep looping until no progress.
+    for _ in range(4):
+        progress = False
+        for d in sorted(search_dirs):
+            for pattern in ("*.so.12", "*.so.13", "*.so"):
+                for so in glob.glob(os.path.join(d, pattern)):
+                    if so in loaded:
+                        continue
+                    try:
+                        ctypes.CDLL(so, mode=ctypes.RTLD_GLOBAL)
+                        loaded.add(so)
+                        progress = True
+                    except OSError:
+                        pass
+        if not progress:
+            break
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +208,9 @@ def score_output(output: str, passkey: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def run_eval(args):
+    # Preload CUDA shared libs from the venv so llama-cpp-python can dlopen
+    # them without requiring the user to set LD_LIBRARY_PATH.
+    _preload_cuda_libs()
     try:
         from llama_cpp import Llama
     except ImportError:
