@@ -1,0 +1,26 @@
+[project]
+name = "qwen3-niah"
+version = "0.1.0"
+description = "Needle-in-a-Haystack evaluation for Qwen3.6-35B-A3B-GGUF across context lengths."
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.4",
+    "huggingface_hub>=0.25",
+    "datasets>=3.0",
+    "sentencepiece",
+    "protobuf",
+    "numpy",
+    "einops",
+    "llama-cpp-python>=0.3",
+]
+
+# Pull the CUDA 12.4 prebuilt llama-cpp-python wheels so we skip the CUDA compile.
+# If this fails on your box, drop the tool.uv.* blocks below and build from source:
+#   CMAKE_ARGS='-DGGML_CUDA=on' uv pip install llama-cpp-python --no-binary llama-cpp-python
+[[tool.uv.index]]
+name = "llama-cpp-cu124"
+url = "https://abetlen.github.io/llama-cpp-python/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+llama-cpp-python = { index = "llama-cpp-cu124" }

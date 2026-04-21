@@ -8,19 +8,36 @@ Needle-in-a-Haystack passkey-retrieval evaluation for [`unsloth/Qwen3.6-35B-A3B-
 
 Tested on an H100 with CUDA 12.4.
 
+### Option A — uv (recommended)
+
+```bash
+uv sync
+# llama-cpp-python is pulled from the prebuilt cu124 index via tool.uv.sources.
+```
+
+### Option B — pip
+
 ```bash
 pip install --upgrade pip
-pip install torch huggingface_hub datasets sentencepiece protobuf numpy einops
-
-# Prebuilt CUDA wheel (fastest)
+pip install -r requirements.txt
 pip install llama-cpp-python \
     --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+```
 
-# Fallback if the prebuilt wheel can't load Qwen3.6 GGUF — build from source:
-# CMAKE_ARGS='-DGGML_CUDA=on' pip install llama-cpp-python --no-binary llama-cpp-python
+### Fallback (build llama-cpp-python from source)
 
-# HF token helps download speed / avoids rate limits
-export HF_TOKEN=hf_...
+If the prebuilt wheel can't load Qwen3.6 GGUF (support for the hybrid arch may be newer than what the wheel ships):
+
+```bash
+CMAKE_ARGS='-DGGML_CUDA=on' uv pip install llama-cpp-python --no-binary llama-cpp-python
+# or with pip
+CMAKE_ARGS='-DGGML_CUDA=on' pip install llama-cpp-python --no-binary llama-cpp-python
+```
+
+### Model download
+
+```bash
+export HF_TOKEN=hf_...   # optional but helps download speed
 
 # Pre-download the GGUF (~22 GB for UD-Q4_K_M)
 huggingface-cli download unsloth/Qwen3.6-35B-A3B-GGUF \
