@@ -1,0 +1,8 @@
+torch
+huggingface_hub
+datasets
+sentencepiece
+protobuf
+numpy
+einops
+# llama-cpp-python requires CUDA setup — see README for the prebuilt-wheel install.
