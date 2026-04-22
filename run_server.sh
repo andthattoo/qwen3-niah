@@ -20,6 +20,23 @@ HOST="${HOST:-127.0.0.1}"
 KV_TYPE="${KV_TYPE:-q8_0}"
 N_GPU_LAYERS="${N_GPU_LAYERS:--1}"
 
+# Map KV_TYPE string → ggml_type integer (what llama-cpp-python's server expects).
+# Accepts either a named type or an integer directly.
+case "${KV_TYPE}" in
+    f32|F32)   KV_INT=0 ;;
+    f16|F16)   KV_INT=1 ;;
+    q4_0|Q4_0) KV_INT=2 ;;
+    q4_1|Q4_1) KV_INT=3 ;;
+    q5_0|Q5_0) KV_INT=6 ;;
+    q5_1|Q5_1) KV_INT=7 ;;
+    q8_0|Q8_0) KV_INT=8 ;;
+    [0-9]*)    KV_INT="${KV_TYPE}" ;;
+    *)
+        echo "ERROR: Unknown KV_TYPE='${KV_TYPE}'. Use f16/q8_0/q4_0 or an integer."
+        exit 1
+        ;;
+esac
+
 if [ -z "${MODEL_PATH:-}" ]; then
     MODEL_PATH="$(find "${HOME}/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF" \
         -name '*Q4_K_M*.gguf' 2>/dev/null | head -1)"
@@ -38,7 +55,7 @@ echo "Starting llama-cpp-python server"
 echo "  model      = ${MODEL_PATH}"
 echo "  n_ctx      = ${N_CTX}"
 echo "  host:port  = ${HOST}:${PORT}"
-echo "  kv_type    = ${KV_TYPE}"
+echo "  kv_type    = ${KV_TYPE}  (ggml type=${KV_INT})"
 echo "  gpu_layers = ${N_GPU_LAYERS}"
 echo
 
@@ -80,7 +97,7 @@ exec "${PY[@]}" -m llama_cpp.server \
     --model "${MODEL_PATH}" \
     --n_gpu_layers "${N_GPU_LAYERS}" \
     --n_ctx "${N_CTX}" \
-    --type_k "${KV_TYPE}" \
-    --type_v "${KV_TYPE}" \
+    --type_k "${KV_INT}" \
+    --type_v "${KV_INT}" \
     --port "${PORT}" \
     --host "${HOST}"
