@@ -11,7 +11,10 @@ dependencies = [
     "protobuf",
     "numpy",
     "einops",
-    "llama-cpp-python>=0.3",
+    "llama-cpp-python[server]>=0.3",
+    # openai SDK is used by longcot_mini_eval.py to hit the local server
+    # (or any OpenAI-compatible endpoint) via chat completions.
+    "openai>=1.0",
     # CUDA 12 runtime — llama-cpp-python prebuilt wheels (from the cu124 index)
     # link against libcudart.so.12, but modern torch brings cu13 by default.
     # Pinning cu12 alongside keeps both happy on the same system.

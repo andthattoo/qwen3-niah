@@ -86,6 +86,49 @@ Output lands in `niah_qwen36/`:
 | `--seeds` | `3` | Samples per (ctx, depth) cell. |
 | `--filename` | `""` | Exact GGUF filename; defaults to pattern-match on `--quant`. |
 
+## LongCoT-Mini reasoning benchmark
+
+Tests the model on [LongHorizonReasoning/longcot](https://huggingface.co/datasets/LongHorizonReasoning/longcot)'s easy split (507 problems across 5 domains: logic, cs, chemistry, chess, math). Complements NIAH — NIAH is *retrieval*; LongCoT-Mini is *multi-step reasoning*.
+
+Two processes, two tmux panes:
+
+### Pane 1 — start the llama.cpp server
+
+```bash
+./run_server.sh
+# Overridable via env:
+#   MODEL_PATH=/custom/path.gguf N_CTX=131072 PORT=8000 ./run_server.sh
+```
+
+Auto-discovers the Q4_K_M GGUF from the HF cache. Uses 8-bit KV (`type_k/type_v=q8_0`) to fit larger contexts. Default `n_ctx=65536` is enough for Qwen3.6's reasoning traces on LongCoT-Mini prompts (≤18K input chars, ≤12K output tokens typical). Bump if you need more.
+
+### Pane 2 — run the benchmark
+
+```bash
+# Smoke test (40 questions, ~1-2 h on H100)
+uv run python longcot_mini_eval.py --domains logic math --n-per-domain 20
+
+# Full mini (507 questions, overnight)
+uv run python longcot_mini_eval.py
+```
+
+Scoring: a proxy `solution = ...` regex + substring fallback against the canonical answer JSON. Output JSONL is compatible with LongCoT's official `run_eval.py` if you want the real verifiers later.
+
+### Remote OpenAI-compat endpoints
+
+Works unchanged with OpenRouter / Anthropic / OpenAI / vLLM / SGLang — just swap `--base-url` and set the right `--api-key-env`:
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+uv run python longcot_mini_eval.py \
+    --base-url https://openrouter.ai/api/v1 \
+    --api-key-env OPENROUTER_API_KEY \
+    --model anthropic/claude-sonnet-4.5 \
+    --domains logic math --n-per-domain 20 --n-workers 8
+```
+
+Useful for establishing an upper-bound baseline before committing to a long local run.
+
 ## Architecture context
 
 Qwen3.6-35B-A3B is a hybrid:
