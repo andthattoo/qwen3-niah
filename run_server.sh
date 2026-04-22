@@ -97,6 +97,7 @@ exec "${PY[@]}" -m llama_cpp.server \
     --model "${MODEL_PATH}" \
     --n_gpu_layers "${N_GPU_LAYERS}" \
     --n_ctx "${N_CTX}" \
+    --flash_attn True \
     --type_k "${KV_INT}" \
     --type_v "${KV_INT}" \
     --port "${PORT}" \
