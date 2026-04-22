@@ -42,21 +42,41 @@ echo "  kv_type    = ${KV_TYPE}"
 echo "  gpu_layers = ${N_GPU_LAYERS}"
 echo
 
-# Make sure the CUDA libs from the venv are on the loader path.  This is the
-# same trick niah_qwen36.py uses — llama-cpp-python dlopen()s libcudart.so.12
-# which isn't found by default.
-if [ -n "${VIRTUAL_ENV:-}" ]; then
-    VENV_NVIDIA="${VIRTUAL_ENV}/lib/python3.10/site-packages/nvidia"
-    if [ -d "${VENV_NVIDIA}" ]; then
-        for sub in "${VENV_NVIDIA}"/*/lib; do
-            if [ -d "${sub}" ]; then
-                export LD_LIBRARY_PATH="${sub}:${LD_LIBRARY_PATH:-}"
-            fi
-        done
-    fi
+# Pick a Python launcher.  We prefer `uv run python` so we pick up the managed
+# venv without requiring it to be activated.  Fall back to python3 / python.
+if command -v uv >/dev/null 2>&1; then
+    PY=(uv run python)
+elif command -v python3 >/dev/null 2>&1; then
+    PY=(python3)
+elif command -v python >/dev/null 2>&1; then
+    PY=(python)
+else
+    echo "ERROR: no python found on PATH."
+    exit 1
 fi
 
-exec python -m llama_cpp.server \
+# Put the venv's bundled nvidia lib dirs on LD_LIBRARY_PATH so
+# llama-cpp-python can dlopen libcudart.so.12 / libcublas.so.12 / etc.
+NVIDIA_LIBS="$("${PY[@]}" -c "
+import os, site
+sp = site.getsitepackages()[0]
+nv = os.path.join(sp, 'nvidia')
+paths = []
+if os.path.isdir(nv):
+    for d in os.listdir(nv):
+        lib = os.path.join(nv, d, 'lib')
+        if os.path.isdir(lib):
+            paths.append(lib)
+print(':'.join(paths))
+" 2>/dev/null || true)"
+
+if [ -n "${NVIDIA_LIBS}" ]; then
+    export LD_LIBRARY_PATH="${NVIDIA_LIBS}:${LD_LIBRARY_PATH:-}"
+    echo "  LD_LIBRARY_PATH prepended with: ${NVIDIA_LIBS}"
+    echo
+fi
+
+exec "${PY[@]}" -m llama_cpp.server \
     --model "${MODEL_PATH}" \
     --n_gpu_layers "${N_GPU_LAYERS}" \
     --n_ctx "${N_CTX}" \
