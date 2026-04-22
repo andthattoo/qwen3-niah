@@ -114,21 +114,6 @@ uv run python longcot_mini_eval.py
 
 Scoring: a proxy `solution = ...` regex + substring fallback against the canonical answer JSON. Output JSONL is compatible with LongCoT's official `run_eval.py` if you want the real verifiers later.
 
-### Remote OpenAI-compat endpoints
-
-Works unchanged with OpenRouter / Anthropic / OpenAI / vLLM / SGLang — just swap `--base-url` and set the right `--api-key-env`:
-
-```bash
-export OPENROUTER_API_KEY=sk-or-...
-uv run python longcot_mini_eval.py \
-    --base-url https://openrouter.ai/api/v1 \
-    --api-key-env OPENROUTER_API_KEY \
-    --model anthropic/claude-sonnet-4.5 \
-    --domains logic math --n-per-domain 20 --n-workers 8
-```
-
-Useful for establishing an upper-bound baseline before committing to a long local run.
-
 ## Architecture context
 
 Qwen3.6-35B-A3B is a hybrid:
