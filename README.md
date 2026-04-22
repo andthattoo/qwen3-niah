@@ -97,7 +97,27 @@ Two processes, two tmux panes:
 ```bash
 ./run_server.sh
 # Overridable via env:
-#   MODEL_PATH=/custom/path.gguf N_CTX=131072 PORT=8000 ./run_server.sh
+#   MODEL_PATH=/custom/path.gguf N_CTX=131072 PORT=8000 KV_TYPE=q8_0 ./run_server.sh
+```
+
+Or run it in the background (survives disconnect):
+
+```bash
+# nohup — logs to server.log, PID saved to server.pid
+nohup ./run_server.sh > server.log 2>&1 &
+echo $! > server.pid
+tail -f server.log               # Ctrl-C stops following; server keeps running
+kill $(cat server.pid)           # stop it later
+
+# tmux — attachable session
+tmux new -d -s qwen-server './run_server.sh'
+tmux attach -t qwen-server       # Ctrl-b d to detach
+tmux kill-session -t qwen-server # stop
+```
+
+Check the server is up:
+```bash
+curl -s http://127.0.0.1:8000/v1/models
 ```
 
 Auto-discovers the Q4_K_M GGUF from the HF cache. Uses 8-bit KV (`type_k/type_v=q8_0`) to fit larger contexts. Default `n_ctx=65536` is enough for Qwen3.6's reasoning traces on LongCoT-Mini prompts (≤18K input chars, ≤12K output tokens typical). Bump if you need more.
