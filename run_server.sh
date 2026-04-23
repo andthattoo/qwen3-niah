@@ -38,16 +38,31 @@ case "${KV_TYPE}" in
 esac
 
 if [ -z "${MODEL_PATH:-}" ]; then
-    MODEL_PATH="$(find "${HOME}/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF" \
-        -name '*Q4_K_M*.gguf' 2>/dev/null | head -1)"
+    # Search a few common locations for the GGUF file.
+    SEARCH_DIRS=(
+        "${HOME}/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF"
+        "${HOME}/models/qwen3.6-gguf"
+        "${HOME}/models"
+        "${HOME}/huggingface"
+        "${HOME}"
+    )
+    for dir in "${SEARCH_DIRS[@]}"; do
+        if [ -d "${dir}" ]; then
+            found="$(find "${dir}" -name '*Q4_K_M*.gguf' 2>/dev/null | head -1)"
+            if [ -n "${found}" ]; then
+                MODEL_PATH="${found}"
+                break
+            fi
+        fi
+    done
 fi
 
-if [ -z "${MODEL_PATH}" ] || [ ! -f "${MODEL_PATH}" ]; then
-    echo "ERROR: could not find Qwen3.6 GGUF in HF cache."
+if [ -z "${MODEL_PATH:-}" ] || [ ! -f "${MODEL_PATH}" ]; then
+    echo "ERROR: could not find Qwen3.6 GGUF."
     echo "Download it first:"
     echo "  huggingface-cli download unsloth/Qwen3.6-35B-A3B-GGUF \\"
     echo "      --include '*Q4_K_M*' --local-dir ~/models/qwen3.6-gguf"
-    echo "Then set MODEL_PATH=/path/to/the.gguf and re-run this script."
+    echo "Or set MODEL_PATH=/path/to/the.gguf explicitly and re-run."
     exit 1
 fi
 
