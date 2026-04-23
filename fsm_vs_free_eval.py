@@ -423,8 +423,92 @@ def main():
             "total_tokens_mean": fsm_total_mean,
         }
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
+    _write_per_problem_report(out / "per_problem.md", results, problems, args)
     print(f"\nSaved → {out / 'results.jsonl'}")
     print(f"Saved → {out / 'summary.json'}")
+    print(f"Saved → {out / 'per_problem.md'}")
+
+
+def _outcome_tag(row: dict) -> str:
+    f = row.get("free", {}).get("pass") if "free" in row else None
+    s = row.get("fsm",  {}).get("pass") if "fsm"  in row else None
+    if f is True  and s is True:  return "🟰 both pass"
+    if f is True  and s is False: return "🔻 FSM regression"
+    if f is False and s is True:  return "🔺 FSM wins"
+    if f is False and s is False: return "❌ both fail"
+    if f is True  and s is None:  return "free only: ✓"
+    if f is False and s is None:  return "free only: ✗"
+    if f is None  and s is True:  return "fsm only: ✓"
+    if f is None  and s is False: return "fsm only: ✗"
+    return "—"
+
+
+def _write_per_problem_report(path: Path, results: list, problems: list, args) -> None:
+    """Write a readable markdown report with one section per problem."""
+    prob_by_id = {p["task_id"]: p for p in problems}
+    lines: list[str] = []
+
+    lines.append(f"# Per-problem FSM vs Free — {args.dataset}, n={len(results)}\n")
+    lines.append(f"**Model:** `{args.model}`  ")
+    lines.append(f"**Max tokens:** {args.max_tokens}  ")
+    lines.append(f"**Grammar:** `{args.grammar_file}`  \n")
+    lines.append("Outcome legend: 🔺 FSM wins on a problem FREE got wrong · "
+                 "🔻 FSM regresses vs FREE · 🟰 both pass · ❌ both fail.\n")
+    lines.append("---\n")
+
+    for row in results:
+        tid = row["task_id"]
+        prob = prob_by_id.get(tid, {})
+        lines.append(f"## {tid} — {_outcome_tag(row)}\n")
+
+        prompt = prob.get("prompt", "")
+        if prompt:
+            snippet = prompt.strip()
+            if len(snippet) > 400:
+                snippet = snippet[:400].rstrip() + " …"
+            lines.append("**Problem:**\n")
+            lines.append("```text")
+            lines.append(snippet)
+            lines.append("```\n")
+
+        def _section(name: str, d: dict) -> list[str]:
+            out_ = [f"### {name}  {'✓ pass' if d.get('pass') else '✗ fail'}  "
+                    f"(think: {d.get('think_tokens','-')} tok, "
+                    f"total: {d.get('total_tokens','-')} tok)\n"]
+            if d.get("err"):
+                out_.append("_error:_")
+                out_.append("```text")
+                out_.append(d["err"].strip())
+                out_.append("```\n")
+            if d.get("extracted_think"):
+                out_.append("_think:_")
+                out_.append("```text")
+                out_.append(d["extracted_think"].strip())
+                out_.append("```\n")
+            if d.get("extracted_code"):
+                out_.append("_code:_")
+                out_.append("```python")
+                out_.append(d["extracted_code"].strip())
+                out_.append("```\n")
+            return out_
+
+        if "free" in row:
+            lines.extend(_section("FREE", row["free"]))
+        if "fsm" in row:
+            lines.extend(_section("FSM",  row["fsm"]))
+
+        # Per-problem compression (if both ran)
+        f = row.get("free", {})
+        s = row.get("fsm", {})
+        ft, st = f.get("think_tokens"), s.get("think_tokens")
+        if ft and st:
+            ratio = ft / max(st, 1)
+            lines.append(f"_think compression_: **{ratio:.2f}×** "
+                         f"({ft} → {st} tokens)\n")
+
+        lines.append("---\n")
+
+    path.write_text("\n".join(lines))
 
 
 if __name__ == "__main__":
