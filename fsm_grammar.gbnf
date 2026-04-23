@@ -1,8 +1,9 @@
 # Terse structured plan for code reasoning — one line per section.
-# Each rule MUST be on a single line (llama.cpp's GBNF parser doesn't
-# accept rules split across multiple lines).
+# Each rule MUST be on a single line (llama.cpp GBNF parser doesn't accept
+# multi-line rule defs).  Use hex escapes for the code section — llama.cpp
+# understands \x09, \x0A, \x0D and ranges; it does NOT understand \- or \+.
 
-root ::= think code
+root  ::= think code
 think ::= "<think>\n" "GOAL: " line "APPROACH: " line "EDGE: " line "</think>\n\n"
-line ::= [^\n]+ "\n"
-code ::= ( [a-zA-Z0-9] | [ \t\n\r] | [!@#$%^&*()_+\-={}\[\]\\|;:'\",.<>/?`~] )+
+line  ::= [^\n]+ "\n"
+code  ::= [\x09\x0A\x0D\x20-\x7E]+
