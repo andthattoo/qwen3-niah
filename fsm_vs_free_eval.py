@@ -95,14 +95,23 @@ CODE_DEF_RE = re.compile(r"^(def\s+\w+.*?)(?=\n\S|\Z)", re.DOTALL | re.MULTILINE
 
 
 def extract_think(text: str) -> str:
-    """Qwen3's chat template hides the opening <think> tag in the visible body —
-    only the closing </think> is kept.  So the reasoning is everything up to
-    </think>.  We also handle the case where both tags are present."""
+    """Pull the reasoning portion out of a response.
+
+    Handles three formats we've seen in practice:
+      1. Full tags:        "<think>...</think> code"
+      2. Closing tag only: "...</think> code"          (some chat templates strip opening)
+      3. No tags at all:   "raw reasoning ```python ..." (Qwen3.6 GGUF chat mode)
+    """
     if "</think>" in text:
         m = THINK_OPEN_CLOSE_RE.search(text)
         if m:
             return m.group(1).strip()
         return text.split("</think>", 1)[0].strip()
+
+    # No tags.  Thinking is whatever comes before the first fenced code block.
+    m = CODE_FENCED_RE.search(text)
+    if m:
+        return text[: m.start()].strip()
     return ""
 
 

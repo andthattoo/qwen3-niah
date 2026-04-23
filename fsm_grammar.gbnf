@@ -1,17 +1,22 @@
-# Structured symbolic plan for code reasoning.
-# Enforces shape of the <think> block; code after </think> is unconstrained.
-# Grammar applies to the full assistant response.
+# Terse structured plan for code reasoning — one line per section, no bullets.
+# Rationale: GBNF has no bounded repetition.  `bullet+` causes the model to
+# emit bullets indefinitely until it hits the token cap, never reaching the
+# rest of the plan.  Single-line sections avoid that trap entirely.
+#
+# Grammar applies to the full assistant response.  Code after </think> is
+# unconstrained.
 
-root       ::= think code
-think      ::= "<think>\n" plan "</think>\n\n"
-plan       ::= goal cases approach edge
-goal       ::= "GOAL: " line
-cases      ::= "CASES:\n" bullet+
-approach   ::= "APPROACH: " line
-edge       ::= "EDGE:\n" bullet+
-bullet     ::= "  - " line
-line       ::= [^\n]+ "\n"
+root ::= think code
 
-# Code section: permissive — any printable/whitespace.
+think ::= "<think>\n"
+          "GOAL: "     line
+          "APPROACH: " line
+          "EDGE: "     line
+          "</think>\n\n"
+
+# One non-empty line ending in a single newline.
+line ::= [^\n]+ "\n"
+
+# Code section: permissive — any printable + whitespace.
 code       ::= ( printable | "\n" )+
 printable  ::= [\x09\x0A\x0D\x20-\x7E]
