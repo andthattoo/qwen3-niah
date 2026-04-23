@@ -1,17 +1,8 @@
-# Minimal structured plan for code reasoning — one line per section.
-# Kept deliberately simple to avoid edge cases in llama.cpp's GBNF engine.
-# Grammar applies to the full assistant response; code after </think>
-# is constrained to a permissive-but-plain character class.
+# Terse structured plan for code reasoning — one line per section.
+# Each rule MUST be on a single line (llama.cpp's GBNF parser doesn't
+# accept rules split across multiple lines).
 
-root ::= "<think>\n"
-         "GOAL: "     line
-         "APPROACH: " line
-         "EDGE: "     line
-         "</think>\n\n"
-         code
-
+root ::= think code
+think ::= "<think>\n" "GOAL: " line "APPROACH: " line "EDGE: " line "</think>\n\n"
 line ::= [^\n]+ "\n"
-
-# Permissive code section — ASCII printable + whitespace.
-# Avoid hex-escape char classes (some llama.cpp builds crash on those).
 code ::= ( [a-zA-Z0-9] | [ \t\n\r] | [!@#$%^&*()_+\-={}\[\]\\|;:'\",.<>/?`~] )+
