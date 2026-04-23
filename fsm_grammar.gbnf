@@ -1,22 +1,17 @@
-# Terse structured plan for code reasoning — one line per section, no bullets.
-# Rationale: GBNF has no bounded repetition.  `bullet+` causes the model to
-# emit bullets indefinitely until it hits the token cap, never reaching the
-# rest of the plan.  Single-line sections avoid that trap entirely.
-#
-# Grammar applies to the full assistant response.  Code after </think> is
-# unconstrained.
+# Minimal structured plan for code reasoning — one line per section.
+# Kept deliberately simple to avoid edge cases in llama.cpp's GBNF engine.
+# Grammar applies to the full assistant response; code after </think>
+# is constrained to a permissive-but-plain character class.
 
-root ::= think code
+root ::= "<think>\n"
+         "GOAL: "     line
+         "APPROACH: " line
+         "EDGE: "     line
+         "</think>\n\n"
+         code
 
-think ::= "<think>\n"
-          "GOAL: "     line
-          "APPROACH: " line
-          "EDGE: "     line
-          "</think>\n\n"
-
-# One non-empty line ending in a single newline.
 line ::= [^\n]+ "\n"
 
-# Code section: permissive — any printable + whitespace.
-code       ::= ( printable | "\n" )+
-printable  ::= [\x09\x0A\x0D\x20-\x7E]
+# Permissive code section — ASCII printable + whitespace.
+# Avoid hex-escape char classes (some llama.cpp builds crash on those).
+code ::= ( [a-zA-Z0-9] | [ \t\n\r] | [!@#$%^&*()_+\-={}\[\]\\|;:'\",.<>/?`~] )+
