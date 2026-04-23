@@ -189,6 +189,8 @@ def make_client(args):
     client = OpenAI(
         base_url=args.base_url,
         api_key=os.environ.get(args.api_key_env, "dummy"),
+        timeout=args.request_timeout,
+        max_retries=0,
     )
     # Pre-flight: verify the server is reachable before running any problems.
     try:
@@ -263,6 +265,8 @@ def main():
 
     p.add_argument("--only", choices=["both", "free", "fsm"], default="both",
                    help="Run one mode only (for debugging).")
+    p.add_argument("--request-timeout", type=float, default=600.0,
+                   help="Per-request HTTP timeout in seconds. Hard-stops stuck calls.")
     p.add_argument("--out-dir", default="fsm_vs_free")
     args = p.parse_args()
 
