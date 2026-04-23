@@ -134,6 +134,38 @@ uv run python longcot_mini_eval.py
 
 Scoring: a proxy `solution = ...` regex + substring fallback against the canonical answer JSON. Output JSONL is compatible with LongCoT's official `run_eval.py` if you want the real verifiers later.
 
+## FSM vs. free thinking — zero-training compression experiment
+
+Does grammar-constrained decoding alone reduce the model's verbose thinking while preserving correctness? No training, no distillation — just GBNF applied to the `<think>` block.
+
+The script runs each HumanEval+ (or MBPP+) problem twice:
+
+- **FREE**: standard thinking-mode generation.
+- **FSM** : same model, same prompt, but the `<think>` block is grammar-constrained to emit a compact structured plan (`GOAL`/`CASES`/`APPROACH`/`EDGE`). Code after `</think>` is unconstrained.
+
+It measures pass@1, mean thinking-token count, and total completion tokens, then reports the accuracy delta and compression ratio.
+
+```bash
+# Server needs to be running (see above).
+uv run python fsm_vs_free_eval.py --n-problems 30 --dataset humaneval
+
+# Or MBPP+
+uv run python fsm_vs_free_eval.py --n-problems 50 --dataset mbpp
+
+# FSM-only or FREE-only for debugging
+uv run python fsm_vs_free_eval.py --only fsm --n-problems 5
+```
+
+The grammar lives in `fsm_grammar.gbnf` — edit it to experiment with different symbolic formats. Results land in `fsm_vs_free/`.
+
+Key dependency: the local llama-cpp-python server must accept the `grammar` parameter in request bodies. It does by default.
+
+**What to look for in the output:**
+
+- If FSM `pass@1` is within ~5pp of FREE and compression is 5–10×, the model can be grammar-constrained into symbolic thinking with negligible quality loss. No training needed.
+- If FSM drops ≥15pp on pass@1, the model genuinely can't reason under this constraint — grammar redesign or actual distillation would be needed.
+- If FSM outputs look templated (same `GOAL/CASES/...` for very different problems), grammar is too rigid or too-narrow slots.
+
 ## Architecture context
 
 Qwen3.6-35B-A3B is a hybrid:

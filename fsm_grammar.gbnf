@@ -1,0 +1,17 @@
+# Structured symbolic plan for code reasoning.
+# Enforces shape of the <think> block; code after </think> is unconstrained.
+# Grammar applies to the full assistant response.
+
+root       ::= think code
+think      ::= "<think>\n" plan "</think>\n\n"
+plan       ::= goal cases approach edge
+goal       ::= "GOAL: " line
+cases      ::= "CASES:\n" bullet+
+approach   ::= "APPROACH: " line
+edge       ::= "EDGE:\n" bullet+
+bullet     ::= "  - " line
+line       ::= [^\n]+ "\n"
+
+# Code section: permissive — any printable/whitespace.
+code       ::= ( printable | "\n" )+
+printable  ::= [\x09\x0A\x0D\x20-\x7E]
