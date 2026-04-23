@@ -116,22 +116,27 @@ def extract_think(text: str) -> str:
 
 
 def extract_code(text: str) -> str:
-    """Pull the Python code out of the response.  Priority:
-      1. A ```python fenced block after </think>
-      2. A fenced block anywhere
+    """Pull the Python code out of the response.
+
+    Free-thinking responses often contain MULTIPLE fenced code blocks as
+    the model drafts and revises its answer.  The final answer is almost
+    always the LAST block, so we prefer last-match over first-match.
+    Priority:
+      1. Last ```python fenced block after </think>
+      2. Last fenced block anywhere
       3. The first 'def ...' block after </think>
       4. Everything after </think> (last resort)
     """
     after_think = text.split("</think>", 1)[-1] if "</think>" in text else text
 
-    # 1. fenced after </think>
-    m = CODE_FENCED_RE.search(after_think)
-    if m:
-        return m.group(1)
-    # 2. fenced anywhere
-    m = CODE_FENCED_RE.search(text)
-    if m:
-        return m.group(1)
+    # 1. last fenced block after </think>
+    matches = CODE_FENCED_RE.findall(after_think)
+    if matches:
+        return matches[-1]
+    # 2. last fenced block anywhere
+    matches = CODE_FENCED_RE.findall(text)
+    if matches:
+        return matches[-1]
     # 3. def ... after </think>
     m = CODE_DEF_RE.search(after_think)
     if m:
