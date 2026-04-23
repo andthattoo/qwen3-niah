@@ -89,30 +89,45 @@ def build_user_prompt(problem: dict, dataset: str) -> str:
 
 
 # Regex for extracting tokens.
-THINK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
+THINK_OPEN_CLOSE_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
 CODE_FENCED_RE = re.compile(r"```(?:python)?\s*\n(.*?)```", re.DOTALL)
-CODE_DEF_RE = re.compile(r"(def\s+\w+.*?)(?=\n\S|\Z)", re.DOTALL)
+CODE_DEF_RE = re.compile(r"^(def\s+\w+.*?)(?=\n\S|\Z)", re.DOTALL | re.MULTILINE)
 
 
 def extract_think(text: str) -> str:
-    m = THINK_RE.search(text)
-    return m.group(1) if m else ""
+    """Qwen3's chat template hides the opening <think> tag in the visible body —
+    only the closing </think> is kept.  So the reasoning is everything up to
+    </think>.  We also handle the case where both tags are present."""
+    if "</think>" in text:
+        m = THINK_OPEN_CLOSE_RE.search(text)
+        if m:
+            return m.group(1).strip()
+        return text.split("</think>", 1)[0].strip()
+    return ""
 
 
 def extract_code(text: str) -> str:
-    # Prefer fenced code block after </think>.
-    after_think = text.split("</think>", 1)[-1]
+    """Pull the Python code out of the response.  Priority:
+      1. A ```python fenced block after </think>
+      2. A fenced block anywhere
+      3. The first 'def ...' block after </think>
+      4. Everything after </think> (last resort)
+    """
+    after_think = text.split("</think>", 1)[-1] if "</think>" in text else text
+
+    # 1. fenced after </think>
     m = CODE_FENCED_RE.search(after_think)
     if m:
         return m.group(1)
-    # Fallback: any fenced block in the whole text
+    # 2. fenced anywhere
     m = CODE_FENCED_RE.search(text)
     if m:
         return m.group(1)
-    # Last resort: the first def found after </think>
+    # 3. def ... after </think>
     m = CODE_DEF_RE.search(after_think)
     if m:
         return m.group(1)
+    # 4. everything after </think>
     return after_think.strip()
 
 
@@ -287,13 +302,15 @@ def main():
                 )
                 row["free"] = {
                     "pass": free_pass,
-                    "err": free_err[:100],
+                    "err": free_err[:200],
                     "think_tokens": count_tokens(free_think, args.tokenizer),
                     "total_tokens": int(free_total_tokens),
-                    "code_first_200": free_code[:200],
+                    "raw_response": free_text,
+                    "extracted_think": free_think[:500],
+                    "extracted_code": free_code[:500],
                 }
             except Exception as e:
-                row["free"] = {"pass": False, "err": f"gen_error: {e}"[:200]}
+                row["free"] = {"pass": False, "err": f"gen_error: {e}"[:300]}
 
         if args.only in ("both", "fsm"):
             try:
@@ -307,13 +324,15 @@ def main():
                 )
                 row["fsm"] = {
                     "pass": fsm_pass,
-                    "err": fsm_err[:100],
+                    "err": fsm_err[:200],
                     "think_tokens": count_tokens(fsm_think, args.tokenizer),
                     "total_tokens": int(fsm_total_tokens),
-                    "code_first_200": fsm_code[:200],
+                    "raw_response": fsm_text,
+                    "extracted_think": fsm_think[:500],
+                    "extracted_code": fsm_code[:500],
                 }
             except Exception as e:
-                row["fsm"] = {"pass": False, "err": f"gen_error: {e}"[:200]}
+                row["fsm"] = {"pass": False, "err": f"gen_error: {e}"[:300]}
 
         dt = time.time() - t_prob
         results.append(row)
