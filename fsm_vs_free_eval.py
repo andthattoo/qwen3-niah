@@ -171,10 +171,25 @@ def run_tests(code: str, test_code: str, entry_point: str, timeout: int = 30) ->
 
 def make_client(args):
     from openai import OpenAI
-    return OpenAI(
+    client = OpenAI(
         base_url=args.base_url,
         api_key=os.environ.get(args.api_key_env, "dummy"),
     )
+    # Pre-flight: verify the server is reachable before running any problems.
+    try:
+        _ = client.models.list()
+    except Exception as e:
+        print(
+            f"ERROR: cannot reach the server at {args.base_url}\n"
+            f"  ({type(e).__name__}: {e})\n\n"
+            "Start the local llama-cpp-python server first:\n"
+            "  nohup ./run_server.sh > server.log 2>&1 &\n"
+            "  tail -f server.log   # wait for 'Uvicorn running on ...'\n\n"
+            "Or point --base-url at whatever OpenAI-compatible endpoint you want.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return client
 
 
 def generate_free(client, model: str, user_prompt: str, max_tokens: int) -> tuple[str, int]:
@@ -305,11 +320,19 @@ def main():
 
         def tag(d): return "✓" if d and d.get("pass") else "✗"
         def tt(d):  return d.get("think_tokens", "-") if d else "-"
+        err_bits = []
+        for m in ("free", "fsm"):
+            d = row.get(m)
+            if d and not d.get("pass"):
+                e = (d.get("err") or "").strip()
+                if e:
+                    err_bits.append(f"{m}: {e[:80]}")
+        err_str = ("  |  " + " ; ".join(err_bits)) if err_bits else ""
         print(
             f"  [{i+1}/{len(problems)}] {prob['task_id']:<16s}  "
             f"free={tag(row.get('free'))} ({tt(row.get('free'))}tt)   "
             f"fsm={tag(row.get('fsm'))}  ({tt(row.get('fsm'))}tt)  "
-            f"{dt:.0f}s"
+            f"{dt:.0f}s{err_str}"
         )
 
     elapsed = time.time() - t_start
