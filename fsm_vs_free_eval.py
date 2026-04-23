@@ -177,11 +177,19 @@ def count_tokens(text: str, model_name: str) -> int:
 # ---------------------------------------------------------------------------
 
 def run_tests(code: str, test_code: str, entry_point: str, timeout: int = 30) -> tuple[bool, str]:
-    # HumanEval/MBPP tests usually define a `check(func)` or run asserts.
+    """Run the model's code + the benchmark test suite in a fresh Python subprocess.
+
+    Uses a tempfile (not `python -c`) because long programs + tests exceed
+    Linux's argv limit (Errno 7 / E2BIG, ~128 KB).
+    """
+    import tempfile
     full = f"{code}\n\n{test_code}\n\ntry:\n    check({entry_point})\nexcept NameError:\n    pass\n"
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tf:
+        tf.write(full)
+        script_path = tf.name
     try:
         proc = subprocess.run(
-            [sys.executable, "-c", full],
+            [sys.executable, script_path],
             timeout=timeout,
             capture_output=True,
         )
@@ -192,6 +200,11 @@ def run_tests(code: str, test_code: str, entry_point: str, timeout: int = 30) ->
         return False, "TIMEOUT"
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"[:200]
+    finally:
+        try:
+            os.unlink(script_path)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
